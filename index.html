@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Лоп-поп</title>
+<style>
+  body, html {
+    margin: 0; padding: 0;
+    height: 100%;
+    background: linear-gradient(135deg, #89f7fe 0%, #66a6ff 100%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    overflow: hidden;
+    user-select: none;
+    transition: background 1s ease;
+  }
+
+  body.theme-new-record {
+    background: linear-gradient(135deg, #fcd34d 0%, #f97316 100%);
+  }
+
+  h1 {
+    color: #fff;
+    margin-bottom: 5px;
+    text-shadow: 1px 1px 5px rgba(0,0,0,0.3);
+  }
+
+  #game-area {
+    position: relative;
+    width: 320px;
+    height: 480px;
+    background: radial-gradient(circle at center, #a2d2ff, #3b82f6);
+    border-radius: 20px;
+    box-shadow: 0 0 25px rgba(0,0,0,0.4);
+    overflow: hidden;
+  }
+
+  .bubble {
+    position: absolute;
+    border-radius: 50%;
+    cursor: pointer;
+    box-shadow:
+      inset -4px -4px 6px rgba(255,255,255,0.7),
+      inset 4px 4px 6px rgba(0,0,0,0.2);
+    transition: transform 0.15s ease-out;
+    user-select: none;
+  }
+
+  /* Цвета пузырьков */
+  .color1 { background: #f97316; } /* Оранжевый */
+  .color2 { background: #10b981; } /* Зеленый */
+  .color3 { background: #3b82f6; } /* Синий */
+  .color4 { background: #8b5cf6; } /* Фиолетовый */
+
+  /* Золотой - много очков */
+  .gold {
+    background: radial-gradient(circle at center, #ffd700, #b8860b);
+    box-shadow:
+      0 0 15px 4px #fffacd88,
+      inset -4px -4px 8px #fffacdaa,
+      inset 4px 4px 8px #b8860bbb;
+  }
+
+  /* Медленный пузырь */
+  .slow {
+    filter: brightness(0.8);
+  }
+
+  /* Быстрый пузырь */
+  .fast {
+    filter: brightness(1.2);
+  }
+
+  /* Мелькающий */
+  @keyframes flicker {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.3; }
+  }
+  .flicker {
+    animation: flicker 1.5s infinite;
+  }
+
+  /* Взрывной пузырь */
+  .explosive {
+    background: #f59e0b;
+    box-shadow:
+      0 0 12px 3px #fcd34daa,
+      inset -4px -4px 8px #fbbf24aa,
+      inset 4px 4px 8px #f59e0baa;
+  }
+
+  /* Анимация лопания */
+  @keyframes pop {
+    0% {
+      transform: scale(1);
+      opacity: 1;
+    }
+    100% {
+      transform: scale(1.8);
+      opacity: 0;
+    }
+  }
+
+  /* Эффект частиц */
+  .particle {
+    position: absolute;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.8);
+    pointer-events: none;
+    animation: particle-move 600ms forwards;
+  }
+
+  @keyframes particle-move {
+    0% {
+      transform: translate(0,0);
+      opacity: 1;
+    }
+    100% {
+      transform: translate(var(--dx), var(--dy));
+      opacity: 0;
+    }
+  }
+
+  #scoreboard, #recordboard, #comboBoard {
+    color: #fff;
+    margin: 8px 0 5px 0;
+    font-size: 18px;
+    text-shadow: 1px 1px 5px rgba(0,0,0,0.3);
+    user-select: none;
+  }
+
+  #start-btn {
+    padding: 12px 20px;
+    font-size: 16px;
+    border: none;
+    border-radius: 30px;
+    background: #2563eb;
+    color: white;
+    cursor: pointer;
+    box-shadow: 0 5px 15px rgba(37, 99, 235, 0.6);
+    transition: background 0.3s ease;
+    margin: 10px 5px 20px 5px;
+    user-select: none;
+  }
+
+  #start-btn:hover {
+    background: #1e40af;
+  }
+
+  /* Адаптация для мобильных */
+  @media (max-width: 400px) {
+    #game-area {
+      width: 90vw;
+      height: 70vh;
+    }
+  }
+</style>
+</head>
+<body>
+
+<h1>Лопаландия</h1>
+<div id="scoreboard">Счёт: 0</div>
+<div id="comboBoard">Комбо: x1</div>
+<div id="recordboard">Рекорд: 0</div>
+
+<button id="start-btn">Старт</button>
+
+<div id="game-area"></div>
+
+<script>
+  const gameArea = document.getElementById('game-area');
+  const scoreBoard = document.getElementById('scoreboard');
+  const recordBoard = document.getElementById('recordboard');
+  const comboBoard = document.getElementById('comboBoard');
+  const startBtn = document.getElementById('start-btn');
+
+  let score = 0;
+  let combo = 0;
+  let comboTimeout = null;
+  let comboMultiplier = 1;
+  let running = false;
+  let speed = 1500;
+  let bubbleInterval = null;
+  let speedTimer = null;
+  let record = localStorage.getItem('bubbleGameRecord') || 0;
+  recordBoard.textContent = `Рекорд: ${record}`;
+
+  const colors = ['color1','color2','color3','color4'];
+
+  function randomInt(min, max) {
+    return Math.floor(Math.random() * (max - min + 1)) + min;
+  }
+
+  function createParticle(x, y) {
+    const particleCount = 8;
+    for(let i=0; i<particleCount; i++) {
+      const particle = document.createElement('div');
+      particle.classList.add('particle');
+      const size = randomInt(3,7);
+      particle.style.width = size + 'px';
+      particle.style.height = size + 'px';
+      particle.style.left = (x - size/2) + 'px';
+      particle.style.top = (y - size/2) + 'px';
+      const dx = (Math.random() - 0.5) * 100 + 'px';
+      const dy = (Math.random() - 0.5) * 100 + 'px';
+      particle.style.setProperty('--dx', dx);
+      particle.style.setProperty('--dy', dy);
+      gameArea.appendChild(particle);
+      particle.addEventListener('animationend', () => particle.remove());
+    }
+  }
+
+  function updateCombo() {
+    comboMultiplier = 1 + Math.floor(combo / 5);
+    comboBoard.textContent = `Комбо: x${comboMultiplier}`;
+  }
+
+  function resetCombo() {
+    combo = 0;
+    comboMultiplier = 1;
+    comboBoard.textContent = `Комбо: x1`;
+  }
+
+  function createBubble() {
+    if (!running) return;
+
+    const bubble = document.createElement('div');
+    const size = randomInt(30, 60);
+    const rnd = Math.random();
+
+    // Убираем розовый и бомбы, остальное как было
+    let isGold = false;
+    let isExplosive = false;
+    let isFlicker = false;
+    let isSlow = false;
+    let isFast = false;
+
+    if (rnd < 0.15) isGold = true;
+    else if (rnd < 0.3) isExplosive = true;
+    else if (rnd < 0.45) isFlicker = true;
+    else if (rnd < 0.65) isSlow = true;
+    else if (rnd < 0.85) isFast = true;
+
+    bubble.classList.add('bubble');
+    if (isGold) bubble.classList.add('gold');
+    else if (isExplosive) bubble.classList.add('explosive');
+    else if (isFlicker) bubble.classList.add('flicker');
+    if (isSlow) bubble.classList.add('slow');
+    if (isFast) bubble.classList.add('fast');
+    if (!isGold && !isExplosive && !isFlicker && !isSlow && !isFast) {
+      bubble.classList.add(colors[randomInt(0, colors.length - 1)]);
+    }
+
+    bubble.style.width = size + 'px';
+    bubble.style.height = size + 'px';
+
+    const maxX = gameArea.clientWidth - size;
+    const maxY = gameArea.clientHeight - size;
+    const x = randomInt(0, maxX);
+    const y = randomInt(0, maxY);
+
+    bubble.style.left = x + 'px';
+    bubble.style.top = y + 'px';
+
+    let lifeTime = 4000;
+    if (isSlow) lifeTime = 6000;
+    else if (isFast) lifeTime = 2500;
+
+    let exploded = false;
+    let popped = false;
+
+    bubble.addEventListener('click', () => {
+      if (!running || popped) return;
+      popped = true;
+
+      combo++;
+      updateCombo();
+      score += comboMultiplier * (isGold ? 5 : 1);
+      scoreBoard.textContent = `Счёт: ${score}`;
+      createParticle(x + size / 2, y + size / 2);
+
+      if (isExplosive && !exploded) {
+        exploded = true;
+        bubble.style.animation = 'pop 0.3s forwards';
+        setTimeout(() => bubble.remove(), 300);
+        const others = [...document.querySelectorAll('.bubble')].filter(b => b !== bubble);
+        others.forEach(bub => {
+          const rect1 = bubble.getBoundingClientRect();
+          const rect2 = bub.getBoundingClientRect();
+          const dx = (rect1.left + rect1.width / 2) - (rect2.left + rect2.width / 2);
+          const dy = (rect1.top + rect1.height / 2) - (rect2.top + rect2.height / 2);
+          const dist = Math.sqrt(dx * dx + dy * dy);
+          if (dist < 100) {
+            bub.style.animation = 'pop 0.3s forwards';
+            setTimeout(() => bub.remove(), 300);
+            score += comboMultiplier * (bub.classList.contains('gold') ? 5 : 1);
+          }
+        });
+        return;
+      }
+
+      bubble.style.animation = 'pop 0.3s forwards';
+      setTimeout(() => bubble.remove(), 300);
+
+      clearTimeout(comboTimeout);
+      comboTimeout = setTimeout(() => {
+        resetCombo();
+      }, 3000);
+    });
+
+    gameArea.appendChild(bubble);
+
+    setTimeout(() => {
+      if (gameArea.contains(bubble) && !popped) {
+        endGame();
+      } else {
+        bubble.remove();
+      }
+    }, lifeTime);
+  }
+
+  function startGame() {
+    if (running) return;
+    running = true;
+    score = 0;
+    combo = 0;
+    comboMultiplier = 1;
+    speed = 1500;
+    scoreBoard.textContent = `Счёт: 0`;
+    comboBoard.textContent = `Комбо: x1`;
+    startBtn.disabled = true;
+    startBtn.textContent = 'Игра идёт...';
+    gameArea.innerHTML = '';
+    document.body.classList.remove('theme-new-record');
+
+    bubbleInterval = setInterval(createBubble, speed);
+
+    speedTimer = setInterval(() => {
+      if (speed > 400) {
+        speed -= 100;
+        clearInterval(bubbleInterval);
+        bubbleInterval = setInterval(createBubble, speed);
+      }
+    }, 10000);
+  }
+
+  function endGame() {
+    running = false;
+    clearInterval(bubbleInterval);
+    clearInterval(speedTimer);
+    clearTimeout(comboTimeout);
+
+    document.querySelectorAll('.bubble').forEach(b => b.remove());
+
+    if (score > record) {
+      record = score;
+      localStorage.setItem('bubbleGameRecord', record);
+      recordBoard.textContent = `Рекорд: ${record}`;
+      document.body.classList.add('theme-new-record');
+    }
+
+    startBtn.disabled = false;
+    startBtn.textContent = 'Старт';
+  }
+
+  startBtn.addEventListener('click', startGame);
+</script>
+</body>
+</html>

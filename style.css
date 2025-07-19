@@ -1,0 +1,94 @@
+* {
+  box-sizing: border-box;
+}
+
+body, html {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  font-family: Arial, sans-serif;
+  background: linear-gradient(135deg, #89f7fe, #66a6ff);
+}
+
+#controls {
+  position: fixed;
+  top: 10px;
+  left: 10px;
+  z-index: 10;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  background: rgba(255, 255, 255, 0.8);
+  padding: 8px 12px;
+  border-radius: 8px;
+}
+
+#controls span {
+  font-weight: bold;
+}
+
+#gameArea {
+  width: 100%;
+  height: 100%;
+  position: relative;
+  overflow: hidden;
+}
+
+.bubble {
+  position: absolute;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.6);
+  border: 2px solid white;
+  cursor: pointer;
+  transition: transform 0.1s;
+}
+
+.bubble:hover {
+  transform: scale(1.1);
+}
+
+.bomb {
+  background: radial-gradient(circle, #ff0000, #900000);
+  border: 2px solid black;
+}
+
+#endScreen {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0,0,0,0.8);
+  display: none;
+  justify-content: center;
+  align-items: center;
+  color: white;
+  flex-direction: column;
+  z-index: 1000;
+}
+
+#endScreen h2 {
+  margin-bottom: 20px;
+}
+
+#endScreen button {
+  padding: 10px 20px;
+  font-size: 16px;
+  border: none;
+  background: white;
+  color: black;
+  cursor: pointer;
+  border-radius: 8px;
+}
+
+.pop {
+  animation: pop 0.3s forwards;
+}
+
+@keyframes pop {
+  to {
+    transform: scale(0);
+    opacity: 0;
+  }
+}
